@@ -20,10 +20,12 @@ library(widyr)
 library(sentimentr)
 library(igraph)
 library(ggraph)
-data("stop_words")
-immigration_stopwords <- tibble(word = read.csv("data/immigration_stopwords.csv")) 
 
-### dems ###
+#load stopwords
+data("stop_words")
+immigration_stopwords <- read.csv("data/immigration_stopwords.csv")
+
+### DEMS ###
 dem_data <- partisan_data %>% filter(X1_if_dem == 1)
 
 dem_words <- dem_data %>%
@@ -36,10 +38,7 @@ count_dem_words <- dem_words %>%
   count(word, sort = TRUE)
 count_dem_words
 
-joined_dem_words <- count_dem_words %>%
-  inner_join(dem_words)
-joined_dem_words
-
+#top dem word graph
 count_dem_words %>%
   top_n(15) %>%
   mutate(word = reorder(word, n)) %>%
@@ -48,6 +47,11 @@ count_dem_words %>%
   coord_flip() +
   labs(title = "Most Frequently Used Word: Democrats")
 
+joined_dem_words <- count_dem_words %>%
+  inner_join(dem_words)
+joined_dem_words
+
+###sentiment analysis
 dem_sentiment <- dem_words %>%
   inner_join(get_sentiments("afinn")) %>%
   count(word, value, sort = FALSE) %>%
@@ -69,13 +73,12 @@ dem_sentiment %>%
 
 ###bigrams
 dem_bigrams <- dem_data %>%
-  unnest_tokens(bigram, Message, token = "ngrams", n = 2)
-
-sep_dem_bigrams <- dem_bigrams %>%
+  unnest_tokens(bigram, Message, token = "ngrams", n = 2) %>%
   separate(bigram, c("word1", "word2"), sep = " ")
 
-dem_bigrams_filtered <- sep_dem_bigrams %>%
-  transmute(sep_dem_bigrams, word1 = gsub('[0-9]', '', sep_dem_bigrams$word1)) %>%
+#filter stopwords
+dem_bigrams_filtered <- dem_bigrams %>%
+  transmute(dem_bigrams, word1 = gsub('[0-9]', '', dem_bigrams$word1)) %>%
   filter(!word1 == ',') %>%
   filter(!word1 == '.')
 dem_bigrams_filtered <- dem_bigrams_filtered %>%
@@ -94,10 +97,11 @@ dem_bigrams_counted <- dem_bigrams_filtered %>%
   filter(!word1 == "administration's") %>%
   filter(!word2 == "administration's") %>%
   filter(!word1 == "") %>%
-  filter(!word2 == "") %>%
-  inner_join(dem_bigrams_filtered)
+  filter(!word2 == "")
 dem_bigrams_counted 
 
+#changeable graph to display words pre/proceeding others
+#change filtering word1 & word2; change the word being filtered 
 dem_bigrams_counted %>%
   filter(word1 == "border") %>%
   filter(n > 5) %>%
@@ -106,13 +110,14 @@ dem_bigrams_counted %>%
   geom_bar(stat = "identity", show.legend = FALSE) +
   facet_wrap(~ word1, scales = "free_y") + 
   coord_flip() +
-  labs(title = "Words Following 'Border': Democrats")
+  labs(title = "Words Following '___': Democrats")
 
 dem_bigrams <- dem_bigrams_counted %>%
   unite(bigram, word1, word2, sep = " ")
+dem_bigrams
 
 dem_bigrams %>%
-  top_n(20) %>%
+  top_n(15) %>%
   mutate(bigram = reorder(bigram, n)) %>%
   ggplot(aes(bigram, n, fill = bigram)) +
   geom_bar(stat = "identity", show.legend = FALSE) +
